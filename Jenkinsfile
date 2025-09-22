@@ -28,7 +28,7 @@ pipeline {
                 sshPublisher(
                     publishers: [
                         sshPublisherDesc(
-                            configName: 'my-production-server', // Имя сервера, настроенное в Jenkins
+                            configName: 'weather-time', // Имя сервера, настроенное в Jenkins
                             transfers: [
                                 sshTransfer(
                                     // Команды, которые выполнятся на удаленном сервере
