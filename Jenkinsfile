@@ -10,6 +10,12 @@ pipeline {
     }
     
     stages {
+        stage('Checkout Code') {
+            steps {
+                checkout scm  // забирает код из GitHub
+                sh 'git log -1 --oneline'  // показываем последний коммит
+            }
+        }
         stage('Build Images') {
             parallel {
                 stage('Build Go API') {
@@ -28,6 +34,17 @@ pipeline {
                                 docker.build("${NEXTJS_IMAGE}:${env.BUILD_ID}")
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    docker.withRegistry("https://${DOCKER_REGISTRY}", 'docker-hub-credentials') {
+                        docker.image("${DOCKER_USERNAME}/go-api:latest").push()
+                        docker.image("${DOCKER_USERNAME}/nextjs:latest").push()
                     }
                 }
             }
