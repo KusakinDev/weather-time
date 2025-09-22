@@ -13,7 +13,7 @@ export default {
         foreground: "var(--foreground)",
 
         //цвета фонов
-        bgPage: '#000000', //'#cad2c5',
+        bgPage: '#cad2c5',
         bgComp: '#84a98c',
         bgElem: '#52796f',
         bgElemActive: '#354f52',
