@@ -20,7 +20,7 @@ WORKDIR /app
 COPY --from=builder /app/main .
 
 # Экспонирование порта (предположим, что ваш API слушает на порту 8080)
-EXPOSE 8080
+EXPOSE 8000
 
 # Запуск приложения
 CMD ["./main"]
