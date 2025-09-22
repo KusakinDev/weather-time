@@ -16,75 +16,27 @@ pipeline {
                 sh 'git log -1 --oneline'  // показываем последний коммит
             }
         }
-        stage('Build Images') {
-            parallel {
-                stage('Build Go API') {
-                    steps {
-                        dir('back') {
-                            script {
-                                docker.build("${GO_API_IMAGE}:${env.BUILD_ID}")
-                            }
-                        }
-                    }
-                }
-                stage('Build Next.js') {
-                    steps {
-                        dir('front/FE_WeatherTime') {
-                            script {
-                                docker.build("${NEXTJS_IMAGE}:${env.BUILD_ID}")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Push to Docker Hub') {
+        stage('Docker Operations') {
             steps {
                 script {
-                    docker.withRegistry("https://${DOCKER_REGISTRY}", 'docker-hub-credentials') {
-                        docker.image("${DOCKER_USERNAME}/go-api:latest").push()
-                        docker.image("${DOCKER_USERNAME}/nextjs:latest").push()
-                    }
-                }
-            }
-        }
-        
-        stage('Test Images') {
-            parallel {
-                stage('Test Go API') {
-                    steps {
-                        script {
-                            docker.image("${GO_API_IMAGE}:${env.BUILD_ID}").inside {
-                                sh 'echo "Running tests for Go API"'
-                                // Добавьте ваши тесты здесь
-                            }
-                        }
-                    }
-                }
-                stage('Test Next.js') {
-                    steps {
-                        script {
-                            docker.image("${NEXTJS_IMAGE}:${env.BUILD_ID}").inside {
-                                sh 'echo "Running tests for Next.js"'
-                                // Добавьте ваши тесты здесь
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        stage('Push Images') {
-            steps {
-                script {
-                    docker.withRegistry("https://${DOCKER_REGISTRY}", 'docker-hub-credentials') {
-                        docker.image("${GO_API_IMAGE}:${env.BUILD_ID}").push()
-                        docker.image("${NEXTJS_IMAGE}:${env.BUILD_ID}").push()
-                        
-                        // Также пушим как latest
-                        docker.image("${GO_API_IMAGE}:${env.BUILD_ID}").push('latest')
-                        docker.image("${NEXTJS_IMAGE}:${env.BUILD_ID}").push('latest')
+                    withCredentials([usernamePassword(
+                        credentialsId: 'docker-hub-credentials', 
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh '''
+                            # Логинимся один раз в начале
+                            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                            
+                            # Все docker команды в одной сессии
+                            cd back
+                            docker build -t debilyator/go-api:${BUILD_NUMBER} .
+                            docker push debilyator/go-api:${BUILD_NUMBER}
+                            
+                            cd ../front/FE_WeatherTime  
+                            docker build -t debilyator/nextjs:${BUILD_NUMBER} .
+                            docker push debilyator/nextjs:${BUILD_NUMBER}
+                        '''
                     }
                 }
             }
