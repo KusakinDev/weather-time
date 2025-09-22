@@ -32,6 +32,7 @@ jobs:
       run: |
         ssh ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} "
           cd /root/weather-time
+          docker-compose down
           git pull origin master
           docker-compose up -d --build
         "
