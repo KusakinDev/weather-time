@@ -49,15 +49,4 @@ pipeline {
             }
         }
     }
-
-    post {
-        success {
-            // Действия при успешном завершении
-            slackSend channel: '#deploys', message: "SUCCESS: Deployment of ${env.JOB_NAME} #${env.BUILD_NUMBER} is complete!"
-        }
-        failure {
-            // Действия при ошибке
-            slackSend channel: '#deploys', message: "FAILED: Deployment of ${env.JOB_NAME} #${env.BUILD_NUMBER} failed!"
-        }
-    }
 }
