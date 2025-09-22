@@ -10,7 +10,7 @@ RUN go mod download
 COPY . .
 
 # Экспонирование порта
-EXPOSE 8080
+EXPOSE 8000
 
 # Команда для запуска в режиме разработки
 CMD ["go", "run", "main.go"]
