@@ -109,3 +109,4 @@ temp/
 go.work
 
 .devcontainer
+.help
