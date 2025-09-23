@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-api
+  namespace: app
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: go-api } }
+  template:
+    metadata: { labels: { app: go-api } }
+    spec:
+      containers:
+        - name: go-api
+          image: app/go-api:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef: { name: app-env }
+          # Если нет эндпоинта /healthz — убери пробы на первый запуск
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 3
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-api
+  namespace: app
+spec:
+  selector: { app: go-api }
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+  type: ClusterIP
