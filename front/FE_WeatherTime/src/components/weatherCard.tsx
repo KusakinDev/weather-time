@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { weatherType } from "@/types/weatherType";
-import { ErrorType } from "@/types/errorType";
+import { weatherType } from "../types/weatherType";
+import { ErrorType } from "../types/errorType";
 import axios from "axios";
-import API_URL from "@/config";
+import API_URL from "../config";
 import { FaSearch, FaTrash } from "react-icons/fa";
 
 type WeatherProps = {

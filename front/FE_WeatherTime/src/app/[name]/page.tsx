@@ -1,9 +1,9 @@
 "use client";
 
 
-import WeatherCard from "@/components/weatherCard";
+import WeatherCard from "../../components/weatherCard";
 import { useParams } from 'next/navigation'
-import { weatherType } from "@/types/weatherType";
+import { weatherType } from "../../types/weatherType";
 
 const WeatherPage = () => {
   const params = useParams()
