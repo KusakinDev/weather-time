@@ -15,15 +15,19 @@ spec:
     spec:
       containers:
         - name: nextjs
-          image: app/nextjs:v1
+          image: app/nextjs:v2            # собери новый тег!
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
           envFrom:
             - secretRef:
                 name: app-env
-          command: ["/bin/sh"]
-          args: ["-c", "npm run build && npm start -H 0.0.0.0 -p 3000"]
+          readinessProbe:
+            httpGet: { path: "/", port: 3000 }
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet: { path: "/", port: 3000 }
+            initialDelaySeconds: 15
 ---
 apiVersion: v1
 kind: Service
