@@ -27,45 +27,21 @@ pipeline {
             }
         }
         
-        stage('Build and Push Docker Images') {
-            steps {
-                script {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'docker-hub-credentials',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )]) {
-                        sh '''
-                            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                            
-                            cd back
-                            docker build -t $DOCKER_USER/go-api:latest .
-                            docker push $DOCKER_USER/go-api:latest
-                            
-                            cd ../front/FE_WeatherTime
-                            docker build -t $DOCKER_USER/nextjs:latest .
-                            docker push $DOCKER_USER/nextjs:latest
-                        '''
-                    }
-                }
-            }
-        }
-        
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                    echo "=== Deploying with SSL fix ==="
+                    minikube image build -t app/go-api:latest ./back
+                    minikube image build -t app/nextjs:latest ./front/FE_WeatherTime
                     
-                    # Вариант 1: Отключаем валидацию SSL
-                    kubectl create namespace $KUBE_NAMESPACE --dry-run=client -o yaml | kubectl apply -f - --validate=false
-                    kubectl apply -f k8s/ -n $KUBE_NAMESPACE --validate=false
+                    # применить манифесты
+                    kubectl apply -f k8s/00-ns.yaml
+                    kubectl apply -f k8s/10-backend.yaml
+                    kubectl apply -f k8s/20-frontend.yaml
+                    kubectl apply -f k8s/30-ingress.yaml
                     
-                    # Обновляем образы
-                    kubectl set image deployment/go-api go-api=$DOCKER_USERNAME/go-api:latest -n $KUBE_NAMESPACE --validate=false
-                    kubectl set image deployment/nextjs nextjs=$DOCKER_USERNAME/nextjs:latest -n $KUBE_NAMESPACE --validate=false
-                    
-                    echo "=== Deployment status ==="
-                    kubectl get all -n $KUBE_NAMESPACE --validate=false
+                    # переключить deployments на тег latest (если в yaml другой)
+                    kubectl -n app set image deploy/nextjs nextjs=app/nextjs:latest
+                    kubectl -n app set image deploy/go-api go-api=app/go-api:latest
                 '''
             }
         }
