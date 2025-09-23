@@ -1,7 +1,7 @@
 "use client";
 
-import WeatherCard from "@/components/weatherCard";
-import { weatherType } from "@/types/weatherType";
+import WeatherCard from "../components/weatherCard";
+import { weatherType } from "../types/weatherType";
 
 export default function Home() {
 
