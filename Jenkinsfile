@@ -34,14 +34,14 @@ pipeline {
                     minikube image build -t app/nextjs:latest ./front/FE_WeatherTime
                     
                     # применить манифесты
-                    minikube kubectl -- apply -f k8s/00-ns.yaml
-                    minikube kubectl -- apply -f k8s/10-backend.yaml
-                    minikube kubectl -- apply -f k8s/20-frontend.yaml
-                    minikube kubectl -- apply -f k8s/30-ingress.yaml
+                    minikube kubectl -- apply -f k8s/00-ns.yaml --validate=false --insecure-skip-tls-verify=true
+                    minikube kubectl -- apply -f k8s/10-backend.yaml --validate=false --insecure-skip-tls-verify=true
+                    minikube kubectl -- apply -f k8s/20-frontend.yaml --validate=false --insecure-skip-tls-verify=true
+                    minikube kubectl -- apply -f k8s/30-ingress.yaml --validate=false --insecure-skip-tls-verify=true
                     
                     # переключить deployments на тег latest (если в yaml другой)
-                    minikube kubectl -- -n app set image deploy/nextjs nextjs=app/nextjs:latest
-                    minikube kubectl -- -n app set image deploy/go-api go-api=app/go-api:latest
+                    minikube kubectl -- -n app set image deploy/nextjs nextjs=app/nextjs:latest --validate=false --insecure-skip-tls-verify=true
+                    minikube kubectl -- -n app set image deploy/go-api go-api=app/go-api:latest --validate=false --insecure-skip-tls-verify=true
                 '''
             }
         }
