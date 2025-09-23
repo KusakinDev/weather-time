@@ -32,13 +32,4 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "200m"
-          initialDelaySeconds: 60  # Увеличил задержку для Next.js
-          periodSeconds: 10
-          timeoutSeconds: 5
-        readinessProbe:
-          httpGet:
-            path: /  # Проверяем главную страницу
-            port: 3000
-          initialDelaySeconds: 30  # Next.js нужно больше времени на старт
-          periodSeconds: 5
-          timeoutSeconds: 3
+        # Убрал livenessProbe и readinessProbe
