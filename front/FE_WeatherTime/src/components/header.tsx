@@ -1,5 +1,4 @@
-"use client"; 
-import Image from 'next/image';
+"use client";
 
 
 const Header: React.FC = () => {
