@@ -34,14 +34,14 @@ pipeline {
                     minikube image build -t app/nextjs:latest ./front/FE_WeatherTime
                     
                     # применить манифесты
-                    kubectl apply -f k8s/00-ns.yaml
-                    kubectl apply -f k8s/10-backend.yaml
-                    kubectl apply -f k8s/20-frontend.yaml
-                    kubectl apply -f k8s/30-ingress.yaml
+                    minikube kubectl -- apply -f k8s/00-ns.yaml
+                    minikube kubectl -- apply -f k8s/10-backend.yaml
+                    minikube kubectl -- apply -f k8s/20-frontend.yaml
+                    minikube kubectl -- apply -f k8s/30-ingress.yaml
                     
                     # переключить deployments на тег latest (если в yaml другой)
-                    kubectl -n app set image deploy/nextjs nextjs=app/nextjs:latest
-                    kubectl -n app set image deploy/go-api go-api=app/go-api:latest
+                    minikube kubectl -- -n app set image deploy/nextjs nextjs=app/nextjs:latest
+                    minikube kubectl -- -n app set image deploy/go-api go-api=app/go-api:latest
                 '''
             }
         }
