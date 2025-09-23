@@ -6,7 +6,6 @@ import { ErrorType } from "@/types/errorType";
 import axios from "axios";
 import API_URL from "@/config";
 import { FaSearch, FaTrash } from "react-icons/fa";
-import Image from 'next/image';
 
 type WeatherProps = {
   initData: weatherType;
