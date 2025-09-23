@@ -54,11 +54,5 @@ data:
                     return 204;
                 }
             }
-
-            # Health checks
-            location /health {
-                proxy_pass http://nextjs/health;
-                proxy_set_header Host $host;
-            }
         }
     }
