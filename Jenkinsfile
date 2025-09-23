@@ -17,24 +17,34 @@ pipeline {
             }
         }
         
-        stage('Debug Structure') {
+        stage('Cleanup Duplicate Manifests') {
             steps {
                 sh """
-                    echo "=== Current Directory Structure ==="
-                    pwd
-                    ls -la
+                    echo "=== Cleaning up duplicate manifests ==="
                     
-                    echo "=== k8s Directory Contents ==="
-                    find . -name "*.yaml" -o -name "*.yml" | sort || echo "No YAML files found"
-                    
-                    if [ -d "k8s" ]; then
-                        echo "=== k8s Folder Details ==="
-                        find k8s/ -type f | sort
-                        echo "=== k8s File Contents ==="
-                        find k8s/ -name "*.yaml" -exec echo "=== File: {} ===" \\; -exec cat {} \\;
-                    else
-                        echo "❌ k8s directory not found!"
+                    # Удаляем дубликаты - оставляем только структурированные файлы в папках
+                    if [ -f "k8s/go-api-deployment.yaml" ]; then
+                        echo "🗑️  Removing duplicate: k8s/go-api-deployment.yaml"
+                        rm -f k8s/go-api-deployment.yaml
                     fi
+                    
+                    if [ -f "k8s/nextjs-deployment.yaml" ]; then
+                        echo "🗑️  Removing duplicate: k8s/nextjs-deployment.yaml"
+                        rm -f k8s/nextjs-deployment.yaml
+                    fi
+                    
+                    # Проверяем service.yaml файлы
+                    if [ -f "k8s/go-api/service.yaml" ]; then
+                        echo "🔍 Checking k8s/go-api/service.yaml"
+                        cat k8s/go-api/service.yaml
+                        if [ ! -s "k8s/go-api/service.yaml" ] || grep -q "no objects passed to apply" k8s/go-api/service.yaml; then
+                            echo "🗑️  Removing empty service.yaml"
+                            rm -f k8s/go-api/service.yaml
+                        fi
+                    fi
+                    
+                    echo "=== Final file structure ==="
+                    find k8s/ -type f | sort
                 """
             }
         }
@@ -66,75 +76,6 @@ pipeline {
             }
         }
         
-        stage('Prepare Manifests') {
-            steps {
-                script {
-                    sh """
-                        echo "=== Preparing Kubernetes Manifests ==="
-                        
-                        # Создаем k8s директорию если её нет
-                        mkdir -p k8s
-                        
-                        # Проверяем существование манифестов
-                        if [ ! -f "k8s/go-api-deployment.yaml" ]; then
-                            echo "⚠️  go-api-deployment.yaml not found, creating basic one..."
-                            cat > k8s/go-api-deployment.yaml << EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: go-api
-  namespace: weather-app
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: go-api
-  template:
-    metadata:
-      labels:
-        app: go-api
-    spec:
-      containers:
-      - name: go-api
-        image: ${DOCKER_USERNAME}/go-api:${env.BUILD_NUMBER}
-        ports:
-        - containerPort: 8000
-EOF
-                        fi
-                        
-                        if [ ! -f "k8s/nextjs-deployment.yaml" ]; then
-                            echo "⚠️  nextjs-deployment.yaml not found, creating basic one..."
-                            cat > k8s/nextjs-deployment.yaml << EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nextjs
-  namespace: weather-app
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: nextjs
-  template:
-    metadata:
-      labels:
-        app: nextjs
-    spec:
-      containers:
-      - name: nextjs
-        image: ${DOCKER_USERNAME}/nextjs:${env.BUILD_NUMBER}
-        ports:
-        - containerPort: 3000
-EOF
-                        fi
-                        
-                        echo "=== Final k8s structure ==="
-                        find k8s/ -type f | sort
-                    """
-                }
-            }
-        }
-        
         stage('Deploy to K8s') {
             steps {
                 script {
@@ -144,72 +85,87 @@ EOF
                         kubectl create namespace ${KUBE_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
                     """
                     
-                    // Применяем манифесты с подробным выводом
+                    // Применяем только нужные манифесты
                     sh """
                         echo "=== Applying Kubernetes manifests ==="
                         
-                        # Применяем каждый файл отдельно с проверкой
-                        for file in k8s/*.yaml k8s/*.yml k8s/*/*.yaml k8s/*/*.yml; do
-                            if [ -f "\$file" ]; then
-                                echo "📄 Applying: \$file"
-                                kubectl apply -f "\$file" --validate=false
-                                if [ \$? -eq 0 ]; then
-                                    echo "✅ Success: \$file"
-                                else
-                                    echo "❌ Failed: \$file"
-                                fi
+                        # Применяем namespace отдельно
+                        kubectl apply -f k8s/namespace.yaml
+                        
+                        # Применяем манифесты из папок (игнорируем корневые дубликаты)
+                        for dir in k8s/go-api k8s/nextjs k8s/nginx; do
+                            if [ -d "\$dir" ]; then
+                                echo "📁 Applying manifests from: \$dir"
+                                for file in \$dir/*.yaml \$dir/*.yml; do
+                                    if [ -f "\$file" ] && [ -s "\$file" ]; then
+                                        echo "📄 Applying: \$file"
+                                        kubectl apply -f "\$file" -n ${KUBE_NAMESPACE} --validate=false
+                                        if [ \$? -eq 0 ]; then
+                                            echo "✅ Success: \$file"
+                                        else
+                                            echo "❌ Failed: \$file"
+                                        fi
+                                    fi
+                                done
                             fi
                         done
                         
-                        echo "=== Waiting for deployments to be created ==="
+                        # Применяем ingress если есть
+                        if [ -f "k8s/ingress.yaml" ] && [ -s "k8s/ingress.yaml" ]; then
+                            echo "📄 Applying: k8s/ingress.yaml"
+                            kubectl apply -f k8s/ingress.yaml -n ${KUBE_NAMESPACE}
+                        fi
+                    """
+                    
+                    // Ждем создания деплойментов
+                    sh """
+                        echo "=== Waiting for deployments ==="
+                        sleep 10
+                        
+                        echo "=== Current deployments ==="
+                        kubectl get deployments -n ${KUBE_NAMESPACE}
+                        
                         # Ждем появления деплойментов
                         for i in {1..30}; do
-                            if kubectl get deployment go-api -n ${KUBE_NAMESPACE} >/dev/null 2>&1; then
-                                echo "✅ go-api deployment found"
+                            if kubectl get deployment go-api -n ${KUBE_NAMESPACE} >/dev/null 2>&1 && \\
+                               kubectl get deployment nextjs -n ${KUBE_NAMESPACE} >/dev/null 2>&1; then
+                                echo "✅ All deployments found"
                                 break
                             fi
-                            echo "⏳ Waiting for go-api deployment... (\$i/30)"
-                            sleep 2
-                        done
-                        
-                        for i in {1..30}; do
-                            if kubectl get deployment nextjs -n ${KUBE_NAMESPACE} >/dev/null 2>&1; then
-                                echo "✅ nextjs deployment found"
-                                break
-                            fi
-                            echo "⏳ Waiting for nextjs deployment... (\$i/30)"
+                            echo "⏳ Waiting for deployments... (\$i/30)"
                             sleep 2
                         done
                     """
                     
-                    // Проверяем что создалось
+                    // Обновляем образы
                     sh """
-                        echo "=== Current Kubernetes state ==="
-                        kubectl get all -n ${KUBE_NAMESPACE} || echo "No resources found in namespace"
+                        echo "=== Updating images ==="
                         
-                        echo "=== Deployments list ==="
-                        kubectl get deployments -n ${KUBE_NAMESPACE} || echo "No deployments found"
-                        
-                        echo "=== Pods list ==="
-                        kubectl get pods -n ${KUBE_NAMESPACE} || echo "No pods found"
-                    """
-                    
-                    // Пробуем обновить образы если деплойменты существуют
-                    sh """
                         if kubectl get deployment go-api -n ${KUBE_NAMESPACE} >/dev/null 2>&1; then
-                            echo "=== Updating go-api image ==="
+                            echo "🔄 Updating go-api image"
                             kubectl set image deployment/go-api go-api=${GO_API_IMAGE}:${env.BUILD_NUMBER} -n ${KUBE_NAMESPACE}
-                            kubectl rollout status deployment/go-api -n ${KUBE_NAMESPACE} --timeout=300s
                         else
-                            echo "❌ go-api deployment not found, skipping rollout"
+                            echo "❌ go-api deployment not found"
                         fi
                         
                         if kubectl get deployment nextjs -n ${KUBE_NAMESPACE} >/dev/null 2>&1; then
-                            echo "=== Updating nextjs image ==="
+                            echo "🔄 Updating nextjs image"
                             kubectl set image deployment/nextjs nextjs=${NEXTJS_IMAGE}:${env.BUILD_NUMBER} -n ${KUBE_NAMESPACE}
-                            kubectl rollout status deployment/nextjs -n ${KUBE_NAMESPACE} --timeout=300s
                         else
-                            echo "❌ nextjs deployment not found, skipping rollout"
+                            echo "❌ nextjs deployment not found"
+                        fi
+                    """
+                    
+                    // Ждем rollout
+                    sh """
+                        echo "=== Waiting for rollout ==="
+                        
+                        if kubectl get deployment go-api -n ${KUBE_NAMESPACE} >/dev/null 2>&1; then
+                            kubectl rollout status deployment/go-api -n ${KUBE_NAMESPACE} --timeout=300s
+                        fi
+                        
+                        if kubectl get deployment nextjs -n ${KUBE_NAMESPACE} >/dev/null 2>&1; then
+                            kubectl rollout status deployment/nextjs -n ${KUBE_NAMESPACE} --timeout=300s
                         fi
                     """
                 }
@@ -219,7 +175,7 @@ EOF
         stage('Verify Deployment') {
             steps {
                 sh """
-                    echo "=== Final deployment status ==="
+                    echo "=== Final status ==="
                     kubectl get all -n ${KUBE_NAMESPACE}
                     
                     echo "=== Pods details ==="
@@ -228,8 +184,8 @@ EOF
                     echo "=== Services ==="
                     kubectl get services -n ${KUBE_NAMESPACE}
                     
-                    echo "=== Application URLs ==="
-                    minikube service list -n ${KUBE_NAMESPACE} || echo "Minikube service command not available"
+                    echo "=== Deployment status ==="
+                    kubectl get deployments -n ${KUBE_NAMESPACE} -o wide
                 """
             }
         }
@@ -237,23 +193,12 @@ EOF
     
     post {
         always {
-            sh '''
-                echo "=== Cleaning up ==="
-                docker system prune -f || true
-            '''
-            script {
-                // Сохраняем логи деплоймента
-                sh """
-                    kubectl get events -n ${KUBE_NAMESPACE} --sort-by='.lastTimestamp' > deployment-events.log || true
-                    kubectl describe namespace ${KUBE_NAMESPACE} > namespace-describe.log || true
-                """
-                archiveArtifacts artifacts: '*.log', fingerprint: true
-            }
+            sh 'docker system prune -f'
         }
         success {
             sh """
-                echo "🚀 Deployment completed successfully!"
-                echo "📊 Check application with: minikube service nginx-service -n ${KUBE_NAMESPACE} --url"
+                echo "🚀 Deployment successful!"
+                echo "📊 Application deployed to namespace: ${KUBE_NAMESPACE}"
             """
         }
         failure {
