@@ -26,6 +26,12 @@
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
   },
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
   "eslintConfig": {
     "rules": {
       "@typescript-eslint/no-unused-vars": "warn",
