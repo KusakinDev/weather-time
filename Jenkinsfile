@@ -42,19 +42,16 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
-                    # Создаем namespace если нет
-                    kubectl create namespace $KUBE_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+                    echo "=== Using minikube kubectl ==="
                     
-                    # Применяем манифесты
-                    kubectl apply -f k8s/ -n $KUBE_NAMESPACE
+                    # Все команды через minikube kubectl (обходит SSL проблемы)
+                    minikube kubectl -- create namespace $KUBE_NAMESPACE --dry-run=client -o yaml | minikube kubectl -- apply -f -
+                    minikube kubectl -- apply -f k8s/ -n $KUBE_NAMESPACE
+                    minikube kubectl -- set image deployment/go-api go-api=$DOCKER_USERNAME/go-api:latest -n $KUBE_NAMESPACE
+                    minikube kubectl -- set image deployment/nextjs nextjs=$DOCKER_USERNAME/nextjs:latest -n $KUBE_NAMESPACE
                     
-                    # Обновляем образы в деплойментах
-                    kubectl set image deployment/go-api go-api=$DOCKER_USERNAME/go-api:latest -n $KUBE_NAMESPACE
-                    kubectl set image deployment/nextjs nextjs=$DOCKER_USERNAME/nextjs:latest -n $KUBE_NAMESPACE
-                    
-                    # Ждем готовности подов
-                    sleep 30
-                    kubectl get pods -n $KUBE_NAMESPACE
+                    # Проверяем
+                    minikube kubectl -- get all -n $KUBE_NAMESPACE
                 '''
             }
         }
