@@ -12,7 +12,7 @@ pipeline {
 
           # 2) Получим kubeconfig для этого профиля в отдельный временный файл
           export KUBECONFIG=$(mktemp)
-          minikube -p ${PROFILE} kubeconfig > "$KUBECONFIG"
+          minikube -p minikube kubectl -- config view --raw > "$KUBECONFIG"
 
           # 3) Базовая проверка доступа
           kubectl --kubeconfig="$KUBECONFIG" cluster-info || true
