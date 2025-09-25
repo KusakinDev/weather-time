@@ -10,9 +10,6 @@ pipeline {
       steps {
         sh '''
 
-          # 1) Убедимся, что minikube запущен (под тем же пользователем, что и Jenkins)
-          minikube -p ${PROFILE} status || minikube -p ${PROFILE} start --driver=docker
-
           # 2) Получим kubeconfig для этого профиля в отдельный временный файл
           export KUBECONFIG=$(mktemp)
           minikube -p ${PROFILE} kubeconfig > "$KUBECONFIG"
