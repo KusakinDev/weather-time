@@ -20,7 +20,7 @@ spec:
                 port:
                   number: 80
           # всё под /api/... -> на бэкенд, при этом /api срезаем
-          - path: /api(/|$)(.*)
+          - path: /
             pathType: ImplementationSpecific
             backend:
               service:
