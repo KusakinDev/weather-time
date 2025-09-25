@@ -9,7 +9,6 @@ pipeline {
     stage('Setup Kubernetes Access') {
       steps {
         sh '''
-          set -euxo pipefail
 
           # 1) Убедимся, что minikube запущен (под тем же пользователем, что и Jenkins)
           minikube -p ${PROFILE} status || minikube -p ${PROFILE} start --driver=docker
