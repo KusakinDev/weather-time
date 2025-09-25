@@ -1,49 +1,67 @@
 pipeline {
-    agent any
-    
-    environment {
-        DOCKER_USERNAME = 'debilyator'
-        KUBE_NAMESPACE = 'weather-app'
+  agent any
+
+  environment {
+    PROFILE = 'minikube'
+  }
+
+  stages {
+    stage('Setup Kubernetes Access') {
+      steps {
+        sh '''
+          set -euxo pipefail
+
+          # 1) Убедимся, что minikube запущен (под тем же пользователем, что и Jenkins)
+          minikube -p ${PROFILE} status || minikube -p ${PROFILE} start --driver=docker
+
+          # 2) Получим kubeconfig для этого профиля в отдельный временный файл
+          export KUBECONFIG=$(mktemp)
+          minikube -p ${PROFILE} kubeconfig > "$KUBECONFIG"
+
+          # 3) Базовая проверка доступа
+          kubectl --kubeconfig="$KUBECONFIG" cluster-info || true
+          kubectl --kubeconfig="$KUBECONFIG" get nodes
+        '''
+      }
     }
-    
-    stages {
-        stage('Setup Kubernetes Access') {
-            steps {
-                sh '''
-                    echo "=== Fixing Kubernetes access ==="
-                    
-                    # Обновляем kubeconfig
-                    minikube update-context || true
-                    
-                    # Проверяем доступ
-                    kubectl cluster-info || echo "Cluster info failed, continuing..."
-                '''
-            }
-        }
-        
-        stage('Checkout Code') {
-            steps {
-                checkout scm
-            }
-        }
-        
-        stage('Deploy to Kubernetes') {
-            steps {
-                sh '''
-                    minikube image build -t app/go-api:latest ./back
-                    minikube image build -t app/nextjs:latest ./front/FE_WeatherTime
-                    
-                    # применить манифесты
-                    minikube kubectl -- apply -f k8s/00-ns.yaml --validate=false --insecure-skip-tls-verify=true
-                    minikube kubectl -- apply -f k8s/10-backend.yaml --validate=false --insecure-skip-tls-verify=true
-                    minikube kubectl -- apply -f k8s/20-frontend.yaml --validate=false --insecure-skip-tls-verify=true
-                    minikube kubectl -- apply -f k8s/30-ingress.yaml --validate=false --insecure-skip-tls-verify=true
-                    
-                    # переключить deployments на тег latest (если в yaml другой)
-                    minikube kubectl -- -n app set image deploy/nextjs nextjs=app/nextjs:latest --validate=false --insecure-skip-tls-verify=true
-                    minikube kubectl -- -n app set image deploy/go-api go-api=app/go-api:latest --validate=false --insecure-skip-tls-verify=true
-                '''
-            }
-        }
+
+    stage('Checkout Code') {
+      steps { checkout scm }
     }
+
+    stage('Build images into Minikube') {
+      steps {
+        sh '''
+          set -euxo pipefail
+          # Строим образы прямо внутрь Minikube
+          minikube -p ${PROFILE} image build -t app/go-api:latest ./back
+          minikube -p ${PROFILE} image build -t app/nextjs:latest ./front/FE_WeatherTime
+        '''
+      }
+    }
+
+    stage('Deploy to Kubernetes') {
+      steps {
+        sh '''
+          set -euxo pipefail
+          export KUBECONFIG=$(mktemp)
+          minikube -p ${PROFILE} kubeconfig > "$KUBECONFIG"
+
+          # Применяем манифесты обычным kubectl с явным kubeconfig
+          kubectl --kubeconfig="$KUBECONFIG" apply -f k8s/00-ns.yaml
+          kubectl --kubeconfig="$KUBECONFIG" apply -f k8s/10-backend.yaml
+          kubectl --kubeconfig="$KUBECONFIG" apply -f k8s/20-frontend.yaml
+          kubectl --kubeconfig="$KUBECONFIG" apply -f k8s/30-ingress.yaml
+
+          # Обновляем образы в деплойментах
+          kubectl --kubeconfig="$KUBECONFIG" -n app set image deploy/nextjs nextjs=app/nextjs:latest
+          kubectl --kubeconfig="$KUBECONFIG" -n app set image deploy/go-api  go-api=app/go-api:latest
+
+          # (опц.) дождаться роллаута
+          kubectl --kubeconfig="$KUBECONFIG" -n app rollout status deploy/nextjs
+          kubectl --kubeconfig="$KUBECONFIG" -n app rollout status deploy/go-api
+        '''
+      }
+    }
+  }
 }
