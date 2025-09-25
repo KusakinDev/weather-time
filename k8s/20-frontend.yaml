@@ -15,7 +15,6 @@ spec:
     spec:
       containers:
         - name: nextjs
-          image: app/nextjs:v2            # собери новый тег!
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
