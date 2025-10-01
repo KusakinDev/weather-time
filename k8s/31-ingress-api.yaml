@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: web
+  name: api
   namespace: app
   annotations:
     nginx.ingress.kubernetes.io/use-regex: "true"
@@ -11,16 +11,7 @@ spec:
   rules:
     - http:
         paths:
-          # фронт
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: nextjs
-                port:
-                  number: 80
-          # всё под /api/... -> на бэкенд, при этом /api срезаем
-          - path: /
+          - path: /api(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
               service:
