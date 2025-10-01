@@ -55,6 +55,7 @@ environment {
       steps {
         sh '''#!/bin/bash
         set -Eeuo pipefail
+        kubectl -n app delete all --all
         minikube -p "${PROFILE}" image build -t app/go-api:latest ./back
         minikube -p "${PROFILE}" image build -t app/nextjs:latest ./front/FE_WeatherTime
         '''
