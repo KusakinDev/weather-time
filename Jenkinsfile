@@ -69,9 +69,6 @@ done
 
 HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$TMP_KUBECONFIG" -n app set image deploy/nextjs nextjs=app/nextjs:latest
 HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$TMP_KUBECONFIG" -n app set image deploy/go-api  go-api=app/go-api:latest
-
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$TMP_KUBECONFIG" -n app rollout status deploy/nextjs
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$TMP_KUBECONFIG" -n app rollout status deploy/go-api
 '''
       }
     }
