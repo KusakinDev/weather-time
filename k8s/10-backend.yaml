@@ -11,7 +11,7 @@ spec:
     spec:
       containers:
         - name: go-api
-          image: app/go-api:v1
+          image: app/go-api:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
