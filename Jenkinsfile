@@ -1,11 +1,12 @@
 pipeline {
   agent any
 
-  environment {
-    PROFILE        = 'minikube'
-    MINIKUBE_HOME  = '/var/lib/jenkins/.minikube'
-    KUBECONFIG     = '/var/lib/jenkins/.kube/config'
-  }
+environment {
+  PROFILE = 'jenkins'
+  MINIKUBE_HOME = '/var/lib/jenkins/.minikube'
+  KUBECONFIG    = '/var/lib/jenkins/.kube/config'
+}
+
 
   stages {
     stage('Who am I') {
