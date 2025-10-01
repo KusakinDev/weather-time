@@ -94,7 +94,7 @@ const WeatherCard: React.FC<WeatherProps> = ({ initData }) => {
     <div className="w-full max-w-lg h-auto mx-auto bg-bgComp shadow-md rounded-xl p-4">
       <div className="mb-4">
         <label htmlFor="city" className="block text-m text-center font-bold text-txComp">
-          Узнайте погоду в городе 1
+          Узнай погоду в городе
         </label>
         <div className="relative mt-4">
           <input
