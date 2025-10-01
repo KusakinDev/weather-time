@@ -47,15 +47,14 @@ pipeline {
           kubectl --kubeconfig="$KUBECONFIG" apply -f k8s/00-ns.yaml
           kubectl --kubeconfig="$KUBECONFIG" apply -f k8s/10-backend.yaml
           kubectl --kubeconfig="$KUBECONFIG" apply -f k8s/20-frontend.yaml
-          kubectl --kubeconfig="$KUBECONFIG" apply -f k8s/30-ingress.yaml
+          kubectl -n app apply -f k8s/30-ingress-web.yaml
+          kubectl -n app apply -f k8s/31-ingress-api.yaml
+          kubectl -n app get ingress -o wide
+
 
           # Обновляем образы в деплойментах
           kubectl --kubeconfig="$KUBECONFIG" -n app set image deploy/nextjs nextjs=app/nextjs:latest
           kubectl --kubeconfig="$KUBECONFIG" -n app set image deploy/go-api  go-api=app/go-api:latest
-
-          # (опц.) дождаться роллаута
-          kubectl --kubeconfig="$KUBECONFIG" -n app rollout status deploy/nextjs
-          kubectl --kubeconfig="$KUBECONFIG" -n app rollout status deploy/go-api
         '''
       }
     }
