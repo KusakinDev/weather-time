@@ -2,7 +2,9 @@ pipeline {
   agent any
 
   environment {
-    PROFILE = 'minikube'
+    PROFILE        = 'minikube'
+    MINIKUBE_HOME  = '/var/lib/jenkins/.minikube'
+    KUBECONFIG     = '/var/lib/jenkins/.kube/config'
   }
 
   stages {
@@ -10,24 +12,24 @@ pipeline {
     stage('Setup Kubernetes Access') {
       steps {
         sh '''#!/bin/bash
-set -euxo pipefail
+set -Eeuo pipefail
 
-# 0) Проверим, что minikube запущен под этим пользователем
-minikube -p "${PROFILE}" status
+# Убедимся, что кластер поднят под пользователем jenkins
+minikube -p "${PROFILE}" status || minikube -p "${PROFILE}" start --driver=docker
 
-# 1) Получаем kubeconfig в temp-файл
-export KUBECONFIG="$(mktemp)"
-minikube -p "${PROFILE}" kubectl -- config view --raw > "$KUBECONFIG"
+# Сформируем временный kubeconfig (сырой), чтобы не трогать глобальный
+TMP_KUBECONFIG="$(mktemp)"
+minikube -p "${PROFILE}" kubectl -- config view --raw > "$TMP_KUBECONFIG"
 
-# 2) Узнаём адрес API сервера и настраиваем NO_PROXY (чтобы kubectl не шел через Jenkins proxy)
-API="$(kubectl --kubeconfig="$KUBECONFIG" config view -o jsonpath='{.clusters[0].cluster.server}')"
+# Разберём адрес API и подготовим NO_PROXY (защитимся, если NO_PROXY не задан)
+API="$(kubectl --kubeconfig="$TMP_KUBECONFIG" config view -o jsonpath='{.clusters[0].cluster.server}' || true)"
 HOSTPORT="${API#https://}"
 HOST="${HOSTPORT%%:*}"
-export NO_PROXY="${NO_PROXY},localhost,127.0.0.1,${HOST},${HOSTPORT},.svc,.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+NO_PROXY="${NO_PROXY:-}"
+export NO_PROXY="${NO_PROXY},localhost,127.0.0.1,${HOST:-},${HOSTPORT:-},.svc,.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
-# 3) Базовая проверка доступа (без прокси)
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECONFIG" cluster-info || true
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECONFIG" get nodes
+# Проверка доступа (обнуляем прокси только на вызов kubectl)
+HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$TMP_KUBECONFIG" get nodes
 '''
       }
     }
@@ -39,8 +41,7 @@ HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECON
     stage('Build images into Minikube') {
       steps {
         sh '''#!/bin/bash
-set -euxo pipefail
-# Строим образы прямо внутрь Minikube
+set -Eeuo pipefail
 minikube -p "${PROFILE}" image build -t app/go-api:latest ./back
 minikube -p "${PROFILE}" image build -t app/nextjs:latest ./front/FE_WeatherTime
 '''
@@ -50,31 +51,27 @@ minikube -p "${PROFILE}" image build -t app/nextjs:latest ./front/FE_WeatherTime
     stage('Deploy to Kubernetes') {
       steps {
         sh '''#!/bin/bash
-set -euxo pipefail
+set -Eeuo pipefail
 
-# kubeconfig ещё раз (новый temp на каждый шаг — безопаснее)
-export KUBECONFIG="$(mktemp)"
-minikube -p "${PROFILE}" kubectl -- config view --raw > "$KUBECONFIG"
+TMP_KUBECONFIG="$(mktemp)"
+minikube -p "${PROFILE}" kubectl -- config view --raw > "$TMP_KUBECONFIG"
 
-API="$(kubectl --kubeconfig="$KUBECONFIG" config view -o jsonpath='{.clusters[0].cluster.server}')"
+API="$(kubectl --kubeconfig="$TMP_KUBECONFIG" config view -o jsonpath='{.clusters[0].cluster.server}' || true)"
 HOSTPORT="${API#https://}"
 HOST="${HOSTPORT%%:*}"
-export NO_PROXY="${NO_PROXY},localhost,127.0.0.1,${HOST},${HOSTPORT},.svc,.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+NO_PROXY="${NO_PROXY:-}"
+export NO_PROXY="${NO_PROXY},localhost,127.0.0.1,${HOST:-},${HOSTPORT:-},.svc,.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
-# Применяем манифесты (везде явно передаём kubeconfig и отключаем прокси)
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECONFIG" apply -f k8s/00-ns.yaml
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECONFIG" apply -f k8s/10-backend.yaml
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECONFIG" apply -f k8s/20-frontend.yaml
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECONFIG" -n app apply -f k8s/30-ingress-web.yaml
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECONFIG" -n app apply -f k8s/31-ingress-api.yaml
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECONFIG" -n app get ingress -o wide
+# Применяем манифесты (везде без прокси)
+for f in k8s/00-ns.yaml k8s/10-backend.yaml k8s/20-frontend.yaml k8s/30-ingress-web.yaml k8s/31-ingress-api.yaml; do
+  HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$TMP_KUBECONFIG" apply -f "$f"
+done
 
-# Обновляем образы и ждём rollout
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECONFIG" -n app set image deploy/nextjs nextjs=app/nextjs:latest
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECONFIG" -n app set image deploy/go-api  go-api=app/go-api:latest
+HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$TMP_KUBECONFIG" -n app set image deploy/nextjs nextjs=app/nextjs:latest
+HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$TMP_KUBECONFIG" -n app set image deploy/go-api  go-api=app/go-api:latest
 
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECONFIG" -n app rollout status deploy/nextjs
-HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$KUBECONFIG" -n app rollout status deploy/go-api
+HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$TMP_KUBECONFIG" -n app rollout status deploy/nextjs
+HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$TMP_KUBECONFIG" -n app rollout status deploy/go-api
 '''
       }
     }
