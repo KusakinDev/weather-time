@@ -8,6 +8,18 @@ pipeline {
   }
 
   stages {
+    stage('Who am I') {
+  steps {
+    sh '''#!/bin/bash
+whoami
+id
+echo "HOME=$HOME"
+echo "MINIKUBE_HOME=${MINIKUBE_HOME:-<empty>}"
+echo "KUBECONFIG=${KUBECONFIG:-<empty>}"
+'''
+  }
+}
+
 
     stage('Setup Kubernetes Access') {
       steps {
