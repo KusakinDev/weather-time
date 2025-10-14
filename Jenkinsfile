@@ -3,8 +3,8 @@ pipeline {
 
 environment {
   PROFILE = 'root'
-  MINIKUBE_HOME = '/var/lib/jenkins/.minikube'
-  KUBECONFIG    = '/var/lib/jenkins/.kube/config'
+  KUBECONFIG = '/root/.kube/config'
+  MINIKUBE_HOME = '/root/.minikube'
 }
 
 
