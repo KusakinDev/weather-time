@@ -2,9 +2,9 @@ pipeline {
   agent any
 
 environment {
-  PROFILE = 'root'
-  KUBECONFIG = '/root/.kube/config'
-  MINIKUBE_HOME = '/root/.minikube'
+  PROFILE = 'jenkins'
+  MINIKUBE_HOME = '/var/lib/jenkins/.minikube'
+  KUBECONFIG    = '/var/lib/jenkins/.kube/config'
 }
 
 
