@@ -83,9 +83,6 @@ environment {
         
         HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$TMP_KUBECONFIG" -n app set image deploy/nextjs nextjs=app/nextjs:latest
         HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= kubectl --kubeconfig="$TMP_KUBECONFIG" -n app set image deploy/go-api  go-api=app/go-api:latest
-        chmod +x update-nginx-config.sh
-        ./update-nginx-config.sh
-        nginx -t && systemctl reload nginx
         '''
       }
     }
