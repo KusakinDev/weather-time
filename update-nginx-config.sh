@@ -4,7 +4,7 @@
 MINIKUBE_IP=$(minikube ip)
 
 # Получаем NodePort сервиса (замените 'your-service-name' на имя вашего сервиса)
-NODE_PORT=$(kubectl get svc your-service-name -o jsonpath='{.spec.ports[0].nodePort}')
+NODE_PORT=$(kubectl get svc weather-time -o jsonpath='{.spec.ports[0].nodePort}')
 
 # Создаем новый конфиг
 cat > /etc/nginx/conf.d/k8s.conf << EOF
