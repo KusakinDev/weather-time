@@ -1,17 +1,26 @@
 #!/bin/bash
 
-# Получаем IP Minikube
-MINIKUBE_IP=$(minikube ip)
+set -euo pipefail
 
-# Получаем NodePort сервиса (замените 'your-service-name' на имя вашего сервиса)
-NODE_PORT=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[0].nodePort}')
+JUSER=jenkins          # имя системного пользователя Jenkins
+PROFILE=jenkins        # профиль minikube, который ты используешь в Jenkins
+
+# 1) Получаем IP minikube и NodePort ИМЕННО от имени jenkins
+IP=$(sudo -u "$JUSER" -H bash -lc \
+  "MINIKUBE_HOME=/var/lib/$JUSER/.minikube KUBECONFIG=/var/lib/$JUSER/.kube/config \
+   minikube -p $PROFILE ip")
+
+PORT=$(sudo -u "$JUSER" -H bash -lc \
+  "KUBECONFIG=/var/lib/$JUSER/.kube/config \
+   kubectl -n ingress-nginx get svc ingress-nginx-controller \
+   -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}'")
 
 # Создаем новый конфиг
 cat > /etc/nginx/conf.d/k8s.conf << EOF
 map \$http_upgrade \$connection_upgrade { default upgrade; "" close; }
 
 upstream k8s_ingress_http {
-    server ${MINIKUBE_IP}:${NODE_PORT};
+    server ${IP}:${PORT};
 }
 
 server {
